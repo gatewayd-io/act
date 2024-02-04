@@ -1,0 +1,39 @@
+policies:
+  - name: passthrough
+    policy: "true"
+    # next:
+    #   - name: log
+  - name: terminate
+    policy: |
+      Signal.terminate == true &&
+      Signal.hook.name == "OnTrafficFromClient" &&
+      Policy.terminate == "stop"
+    # &&
+    # hasPrefix(server.address, "192.168.1.1:")
+    metadata:
+      terminate: stop
+      hook:
+        terminate: OnTrafficFromClient
+      # server:
+      #   address: "192.168.1.1:5432"
+    # next:
+    #   - name: log
+    #   - name: call
+  # - name: selectall
+  #   policy: |
+  #     "query" in signal && hasPrefix(lower(signal.query), prefix)
+  #   metadata:
+  #     prefix: "select *"
+  - name: log
+    policy: Signal.log == true && Policy.log.enabled
+    metadata:
+      log:
+        enabled: true
+  - name: call
+    policy: Signal.call == true && Policy.call == "run"
+    metadata:
+      call: run
+  - name: cache
+    policy: Signal.cache == true && Policy.cache == "enabled"
+    metadata:
+      cache: enabled
