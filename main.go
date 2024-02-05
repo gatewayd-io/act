@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"main/act"
 	"os"
 	"sync"
@@ -64,7 +66,17 @@ func main() {
 		Name: "log",
 		Sync: false,
 		Run: func(data map[string]any) (bool, error) {
-			log.Printf("%v", data)
+			metadata := cast.ToStringMapString(data[act.Metadata])
+			attrs := make([]slog.Attr, 0, len(metadata))
+			for k, v := range metadata {
+				attrs = append(attrs, slog.Attr{
+					Key:   k,
+					Value: slog.StringValue(v),
+				})
+			}
+			slog.LogAttrs(
+				context.TODO(), slog.LevelInfo, "Logger called", attrs...,
+			)
 			return true, nil
 		},
 	}
@@ -72,7 +84,17 @@ func main() {
 		Name: "call",
 		Sync: false,
 		Run: func(data map[string]any) (bool, error) {
-			log.Printf("%v", data)
+			metadata := cast.ToStringMapString(data[act.Metadata])
+			attrs := make([]slog.Attr, 0, len(metadata))
+			for k, v := range metadata {
+				attrs = append(attrs, slog.Attr{
+					Key:   k,
+					Value: slog.StringValue(v),
+				})
+			}
+			slog.LogAttrs(
+				context.TODO(), slog.LevelInfo, "Logger called", attrs...,
+			)
 			return true, nil
 		},
 	}
@@ -127,7 +149,25 @@ func main() {
 			select {
 			case i := <-r.Inputs:
 				matchedPolicy := cast.ToString(i.Data[act.MatchedPolicy])
-				fmt.Println(reg.Actions[matchedPolicy].Run(i.Data))
+				result, err := reg.Actions[matchedPolicy].Run(i.Data)
+				attrs := []slog.Attr{}
+				attrs = append(attrs, slog.Attr{
+					Key:   "result",
+					Value: slog.BoolValue(result),
+				})
+				attrs = append(attrs, slog.Attr{
+					Key:   "name",
+					Value: slog.StringValue(matchedPolicy),
+				})
+				if err != nil {
+					attrs = append(attrs, slog.Attr{
+						Key:   "error",
+						Value: slog.StringValue(fmt.Sprintf("%v", err)),
+					})
+				}
+				slog.LogAttrs(
+					context.TODO(), slog.LevelInfo, "Result of running action", attrs...,
+				)
 			}
 		}
 	}(reg, &wg)
@@ -148,30 +188,57 @@ func main() {
 					Verdict:       cast.ToBool(v.Data[act.Verdict]),
 					Metadata:      cast.ToStringMap(v.Data[act.Metadata]),
 				}
-				// fmt.Printf("Data: %v\n", data)
-				fmt.Printf("Matched: %v\n", data.MatchedPolicy)
-				fmt.Printf("Sync: %v\n", data.Sync)
-				fmt.Printf("Verdict: %v\n", data.Verdict)
-				fmt.Printf("Metadata: %v\n", data.Metadata)
+
+				slog.LogAttrs(
+					context.TODO(), slog.LevelInfo, "Verdict", slog.Attr{
+						Key:   "matched",
+						Value: slog.StringValue(data.MatchedPolicy),
+					}, slog.Attr{
+						Key:   "sync",
+						Value: slog.BoolValue(data.Sync),
+					}, slog.Attr{
+						Key:   "verdict",
+						Value: slog.BoolValue(data.Verdict),
+					},
+				)
+
 				if data.Sync {
 					result, err := reg.Actions[data.MatchedPolicy].Run(v.Data)
+					attrs := []slog.Attr{}
+					attrs = append(attrs, slog.Attr{
+						Key:   "result",
+						Value: slog.BoolValue(result),
+					})
+					attrs = append(attrs, slog.Attr{
+						Key:   "name",
+						Value: slog.StringValue(data.MatchedPolicy),
+					})
 					if err != nil {
-						fmt.Printf("Error: %v\n", err)
-					} else {
-						fmt.Printf("Result: %v\n", result)
+						attrs = append(attrs, slog.Attr{
+							Key:   "error",
+							Value: slog.StringValue(fmt.Sprintf("%v", err)),
+						})
 					}
+					slog.LogAttrs(
+						context.TODO(), slog.LevelInfo, "Result of running action", attrs...,
+					)
 				} else {
 					go func(r *act.Registry, res *act.Result) {
 						err := r.Queue.Queue(res)
 						if err != nil {
 							log.Println(err)
 						}
+						slog.LogAttrs(
+							context.TODO(), slog.LevelInfo, "Queued task", slog.Attr{
+								Key:   "matched",
+								Value: slog.StringValue(data.MatchedPolicy),
+							},
+						)
 					}(r, v)
 				}
 			} else {
-				fmt.Println("No verdict")
+				slog.LogAttrs(context.TODO(), slog.LevelInfo, "No verdict")
 			}
-			fmt.Println("-----------------------------")
 		}
 	}(reg, &wg)
 

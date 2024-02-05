@@ -1,9 +1,11 @@
 package act
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
+	"log/slog"
 
 	"github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/vm"
@@ -91,7 +93,10 @@ func (p *Policy) Eval(data Input) *Result {
 	output, err := expr.Run(p.program, data)
 	if err != nil {
 		// TODO: Log or return error.
-		fmt.Println(err)
+		slog.LogAttrs(context.TODO(), slog.LevelError, "Error running policy", slog.Attr{
+			Key:   "error",
+			Value: slog.StringValue(err.Error()),
+		})
 		return nil
 	}
 	o, ok := output.(bool)
