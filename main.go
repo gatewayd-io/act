@@ -31,7 +31,7 @@ func main() {
 				if p, ok := p.(map[string]interface{}); ok {
 					name := p["name"].(string)
 					policy := p["policy"].(string)
-					metadata, ok := p["metadata"].(map[string]interface{})
+					metadata, ok := p[act.Metadata].(map[string]interface{})
 					if !ok {
 						metadata = map[string]interface{}{}
 					}
@@ -50,7 +50,7 @@ func main() {
 		Name: "terminate",
 		Sync: true,
 		Run: func(data map[string]any) (bool, error) {
-			result, ok := data[act.Data].(bool)
+			result, ok := data[act.Verdict].(bool)
 			if ok {
 				return result, nil
 			}
@@ -61,7 +61,7 @@ func main() {
 		Name: "log",
 		Sync: false,
 		Run: func(data map[string]any) (bool, error) {
-			result, ok := data[act.Data].(bool)
+			result, ok := data[act.Verdict].(bool)
 			if ok {
 				fmt.Printf("Log: %v\n", result)
 				return true, nil
@@ -73,7 +73,7 @@ func main() {
 		Name: "call",
 		Sync: false,
 		Run: func(data map[string]any) (bool, error) {
-			result, ok := data[act.Data].(bool)
+			result, ok := data[act.Verdict].(bool)
 			if ok {
 				fmt.Printf("Call: %v\n", result)
 				return true, nil
@@ -129,16 +129,19 @@ func main() {
 			data := struct {
 				MatchedPolicy string
 				Sync          bool
-				Data          bool
+				Verdict       bool
+				Metadata      map[string]any
 			}{
 				MatchedPolicy: v.Data[act.MatchedPolicy].(string),
 				Sync:          v.Data[act.Sync].(bool),
-				Data:          v.Data[act.Data].(bool),
+				Verdict:       v.Data[act.Verdict].(bool),
+				Metadata:      v.Data[act.Metadata].(map[string]any),
 			}
 			// fmt.Printf("Data: %v\n", data)
 			fmt.Printf("Matched: %v\n", data.MatchedPolicy)
 			fmt.Printf("Sync: %v\n", data.Sync)
-			fmt.Printf("Data: %v\n", data.Data)
+			fmt.Printf("Verdict: %v\n", data.Verdict)
+			fmt.Printf("Metadata: %v\n", data.Metadata)
 			result, err := reg.Actions[data.MatchedPolicy].Run(v.Data)
 			if err != nil {
 				fmt.Printf("Error: %v\n", err)

@@ -9,10 +9,11 @@ import (
 )
 
 const (
-	Data          = "data"
+	Verdict       = "verdict"
 	Decision      = "decision"
 	Sync          = "sync"
 	MatchedPolicy = "matched"
+	Metadata      = "metadata"
 )
 
 type Result struct {
@@ -23,7 +24,7 @@ var DefaultResult = func() *Result {
 	return &Result{
 		Data: map[string]any{
 			MatchedPolicy: "passthrough",
-			Data:          true, // TODO: Check the policy and return the result.
+			Verdict:       true, // TODO: Check the policy and return the result.
 			Sync:          true,
 		},
 	}
@@ -102,8 +103,9 @@ func (p *Policy) Eval(data Input) *Result {
 	return &Result{
 		Data: map[string]any{
 			MatchedPolicy: p.Name,
-			Data:          o,
+			Verdict:       o,
 			Sync:          data.Sync,
+			Metadata:      data.Signal,
 		},
 	}
 }

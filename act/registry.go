@@ -37,7 +37,7 @@ func NewRegistry(defaultPolicy string) *Registry {
 			"passthrough": {
 				Name: "passthrough",
 				Metadata: map[string]any{
-					Data: true,
+					Verdict: true,
 				},
 				Sync: true,
 			},
@@ -46,7 +46,7 @@ func NewRegistry(defaultPolicy string) *Registry {
 			"passthrough": {
 				Name: "passthrough",
 				Metadata: map[string]any{
-					Data: true,
+					Verdict: true,
 				},
 				Sync: true,
 				Run: func(data map[string]any) (bool, error) {
