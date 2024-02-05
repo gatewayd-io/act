@@ -1,6 +1,7 @@
 package act
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 
@@ -18,6 +19,14 @@ const (
 
 type Result struct {
 	Data map[string]any
+}
+
+func (s *Result) Bytes() []byte {
+	b, err := json.Marshal(s)
+	if err != nil {
+		panic(err)
+	}
+	return b
 }
 
 var DefaultResult = func() *Result {

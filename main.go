@@ -5,13 +5,16 @@ import (
 	"log"
 	"main/act"
 	"os"
+	"sync"
 
+	"github.com/spf13/cast"
 	"gopkg.in/yaml.v3"
 )
 
 func main() {
 	// Create a new registry for policies and actions with a default policy.
 	reg := act.NewRegistry("passthrough")
+	defer reg.Queue.Release()
 
 	// Read policies from YAML file.
 	yamlFile, err := os.ReadFile("policies.yaml")
@@ -61,24 +64,16 @@ func main() {
 		Name: "log",
 		Sync: false,
 		Run: func(data map[string]any) (bool, error) {
-			result, ok := data[act.Verdict].(bool)
-			if ok {
-				fmt.Printf("Log: %v\n", result)
-				return true, nil
-			}
-			return false, fmt.Errorf("Invalid data type")
+			log.Printf("%v", data)
+			return true, nil
 		},
 	}
 	reg.Actions["call"] = act.Action{
 		Name: "call",
 		Sync: false,
 		Run: func(data map[string]any) (bool, error) {
-			result, ok := data[act.Verdict].(bool)
-			if ok {
-				fmt.Printf("Call: %v\n", result)
-				return true, nil
-			}
-			return false, fmt.Errorf("Invalid data type")
+			log.Printf("%v", data)
+			return true, nil
 		},
 	}
 
@@ -123,34 +118,62 @@ func main() {
 		},
 	})
 
-	// Print the verdict.
-	for _, v := range verdict {
-		if v != nil {
-			data := struct {
-				MatchedPolicy string
-				Sync          bool
-				Verdict       bool
-				Metadata      map[string]any
-			}{
-				MatchedPolicy: v.Data[act.MatchedPolicy].(string),
-				Sync:          v.Data[act.Sync].(bool),
-				Verdict:       v.Data[act.Verdict].(bool),
-				Metadata:      v.Data[act.Metadata].(map[string]any),
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func(r *act.Registry, wg *sync.WaitGroup) {
+		defer wg.Done()
+		for {
+			select {
+			case i := <-r.Inputs:
+				matchedPolicy := cast.ToString(i.Data[act.MatchedPolicy])
+				fmt.Println(reg.Actions[matchedPolicy].Run(i.Data))
 			}
-			// fmt.Printf("Data: %v\n", data)
-			fmt.Printf("Matched: %v\n", data.MatchedPolicy)
-			fmt.Printf("Sync: %v\n", data.Sync)
-			fmt.Printf("Verdict: %v\n", data.Verdict)
-			fmt.Printf("Metadata: %v\n", data.Metadata)
-			result, err := reg.Actions[data.MatchedPolicy].Run(v.Data)
-			if err != nil {
-				fmt.Printf("Error: %v\n", err)
-			} else {
-				fmt.Printf("Result: %v\n", result)
-			}
-		} else {
-			fmt.Println("No verdict")
 		}
-		fmt.Println("-----------------------------")
-	}
+	}(reg, &wg)
+
+	go func(r *act.Registry, wg *sync.WaitGroup) {
+		defer wg.Done()
+		// Print the verdict.
+		for _, v := range verdict {
+			if v != nil {
+				data := struct {
+					MatchedPolicy string
+					Sync          bool
+					Verdict       bool
+					Metadata      map[string]any
+				}{
+					MatchedPolicy: cast.ToString(v.Data[act.MatchedPolicy]),
+					Sync:          cast.ToBool(v.Data[act.Sync]),
+					Verdict:       cast.ToBool(v.Data[act.Verdict]),
+					Metadata:      cast.ToStringMap(v.Data[act.Metadata]),
+				}
+				// fmt.Printf("Data: %v\n", data)
+				fmt.Printf("Matched: %v\n", data.MatchedPolicy)
+				fmt.Printf("Sync: %v\n", data.Sync)
+				fmt.Printf("Verdict: %v\n", data.Verdict)
+				fmt.Printf("Metadata: %v\n", data.Metadata)
+				if data.Sync {
+					result, err := reg.Actions[data.MatchedPolicy].Run(v.Data)
+					if err != nil {
+						fmt.Printf("Error: %v\n", err)
+					} else {
+						fmt.Printf("Result: %v\n", result)
+					}
+				} else {
+					go func(r *act.Registry, res *act.Result) {
+						err := r.Queue.Queue(res)
+						if err != nil {
+							log.Println(err)
+						}
+					}(r, v)
+				}
+			} else {
+				fmt.Println("No verdict")
+			}
+			fmt.Println("-----------------------------")
+		}
+	}(reg, &wg)
+
+	wg.Wait()
 }

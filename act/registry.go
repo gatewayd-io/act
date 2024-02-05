@@ -1,8 +1,13 @@
 package act
 
 import (
+	"context"
+	"encoding/json"
 	"log"
 	"slices"
+
+	"github.com/golang-queue/queue"
+	"github.com/golang-queue/queue/core"
 )
 
 const defaultPolicy = "passthrough"
@@ -15,9 +20,14 @@ type Registry struct {
 
 	Positive []string
 	Negative []string
+
+	// Job queue
+	Inputs chan *Result
+	Queue  *queue.Queue
 }
 
 type Input struct {
+	Name   string
 	Policy map[string]any `json:"policy"`
 	Signal map[string]any `json:"signal"`
 	Sync   bool
@@ -32,6 +42,8 @@ func NewInput(policy map[string]any, signal map[string]any, sync bool) Input {
 }
 
 func NewRegistry(defaultPolicy string) *Registry {
+	resultsCh := make(chan *Result, 2)
+
 	return &Registry{
 		Signals: map[string]Signal{
 			"passthrough": {
@@ -68,6 +80,21 @@ func NewRegistry(defaultPolicy string) *Registry {
 		Negative: []string{
 			"terminate", "block", "drop", "reject", "reset",
 		},
+		Inputs: resultsCh,
+		Queue: queue.NewPool(2,
+			queue.WithFn(func(ctx context.Context, m core.QueuedMessage) error {
+				v, ok := m.(*Result)
+				if !ok {
+					if err := json.Unmarshal(m.Bytes(), &v); err != nil {
+						return err
+					}
+				}
+
+				resultsCh <- v
+
+				return nil
+			}),
+		),
 	}
 }
 
@@ -113,24 +140,7 @@ func (r *Registry) apply(signal Signal) *Result {
 		return DefaultResult()
 	}
 
-	if action.Sync {
-		return policy.Eval(NewInput(policy.Metadata, signal.Metadata, action.Sync))
-	} else {
-		return r.enqueue(policy, action, signal)
-	}
-}
-
-func (r *Registry) enqueue(policy Policy, action Action, signal Signal) *Result {
-	// TODO: Queue the action and return the result.
-	/*go*/
-	return policy.Eval(
-		NewInput(policy.Metadata, signal.Metadata, action.Sync),
-	)
-	// return &Result{
-	// 	Data: map[string]any{
-	// 		Sync: false,
-	// 	},
-	// }
+	return policy.Eval(NewInput(policy.Metadata, signal.Metadata, action.Sync))
 }
 
 func (r *Registry) Conflict(signals []Signal) (bool, []string, []string) {
