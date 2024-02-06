@@ -9,12 +9,15 @@ import (
 
 	"github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/vm"
+	"github.com/spf13/cast"
 )
 
 const (
 	Verdict       = "verdict"
 	Decision      = "decision"
 	Sync          = "sync"
+	ActionSync    = "actionSync"
+	SignalSync    = "signalSync"
 	MatchedPolicy = "matched"
 	Metadata      = "metadata"
 )
@@ -48,13 +51,14 @@ type Policy struct {
 	Name     string
 	Policy   string
 	Metadata map[string]any
+	Sync     bool
 }
 
 func NewPolicy(name string, policy string, args map[string]any, opts ...expr.Option) *Policy {
 	print := expr.Function("print", func(a ...any) (any, error) {
 		return fmt.Println(a)
 	})
-	opts = append(opts, expr.Env(NewInput(args, map[string]any{}, true)))
+	opts = append(opts, expr.Env(NewInput(name, args, map[string]any{}, true, true)))
 	opts = append(opts, print)
 
 	program, err := expr.Compile(policy, opts...)
@@ -89,6 +93,19 @@ func (p *Policy) Eval(data Input) *Result {
 	// 	}
 	// }
 
+	// Check if the action and signal sync are in sync and warn if not.
+	if data.ActionSync != data.SignalSync {
+		slog.LogAttrs(
+			context.TODO(), slog.LevelWarn, "Action and signal sync mismatch", slog.Attr{
+				Key:   "action",
+				Value: slog.StringValue(data.Name),
+			}, slog.Attr{
+				Key:   "sync",
+				Value: slog.BoolValue(cast.ToBool(data.Signal[Sync])),
+			},
+		)
+	}
+
 	// Run the policy.
 	output, err := expr.Run(p.program, data)
 	if err != nil {
@@ -118,7 +135,8 @@ func (p *Policy) Eval(data Input) *Result {
 		Data: map[string]any{
 			MatchedPolicy: p.Name,
 			Verdict:       o,
-			Sync:          data.Sync,
+			ActionSync:    data.ActionSync,
+			SignalSync:    data.SignalSync,
 			Metadata:      data.Signal,
 		},
 	}

@@ -27,17 +27,22 @@ type Registry struct {
 }
 
 type Input struct {
-	Name   string
-	Policy map[string]any `json:"policy"`
-	Signal map[string]any `json:"signal"`
-	Sync   bool
+	Name       string
+	Policy     map[string]any `json:"policy"`
+	Signal     map[string]any `json:"signal"`
+	ActionSync bool
+	SignalSync bool
 }
 
-func NewInput(policy map[string]any, signal map[string]any, sync bool) Input {
+func NewInput(
+	name string, policy map[string]any, signal map[string]any, actionSync, signalSync bool,
+) Input {
 	return Input{
-		Policy: policy,
-		Signal: signal,
-		Sync:   sync,
+		Name:       name,
+		Policy:     policy,
+		Signal:     signal,
+		ActionSync: actionSync,
+		SignalSync: signalSync,
 	}
 }
 
@@ -140,7 +145,9 @@ func (r *Registry) apply(signal Signal) *Result {
 		return DefaultResult()
 	}
 
-	return policy.Eval(NewInput(policy.Metadata, signal.Metadata, action.Sync))
+	// Action dictates the sync mode, not the signal.
+	return policy.Eval(
+		NewInput(signal.Name, policy.Metadata, signal.Metadata, action.Sync, signal.Sync))
 }
 
 func (r *Registry) Conflict(signals []Signal) (bool, []string, []string) {

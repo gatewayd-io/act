@@ -29,27 +29,6 @@ func main() {
 		log.Fatalf("Error unmarshalling YAML: %v", err)
 	}
 
-	// Register policies.
-	if v, ok := data["policies"]; ok {
-		if policies, ok := v.([]interface{}); ok {
-			for _, p := range policies {
-				if p, ok := p.(map[string]interface{}); ok {
-					name := p["name"].(string)
-					policy := p["policy"].(string)
-					metadata, ok := p[act.Metadata].(map[string]interface{})
-					if !ok {
-						metadata = map[string]interface{}{}
-					}
-
-					p := act.NewPolicy(name, policy, metadata)
-					if p != nil {
-						reg.Policies[name] = *p
-					}
-				}
-			}
-		}
-	}
-
 	// Register actions.
 	reg.Actions["terminate"] = act.Action{
 		Name: "terminate",
@@ -97,6 +76,27 @@ func main() {
 			)
 			return true, nil
 		},
+	}
+
+	// Register policies.
+	if v, ok := data["policies"]; ok {
+		if policies, ok := v.([]interface{}); ok {
+			for _, p := range policies {
+				if p, ok := p.(map[string]interface{}); ok {
+					name := p["name"].(string)
+					policy := p["policy"].(string)
+					metadata, ok := p[act.Metadata].(map[string]interface{})
+					if !ok {
+						metadata = map[string]interface{}{}
+					}
+
+					p := act.NewPolicy(name, policy, metadata)
+					if p != nil {
+						reg.Policies[name] = *p
+					}
+				}
+			}
+		}
 	}
 
 	// Apply a signal to the registry.
@@ -179,12 +179,14 @@ func main() {
 			if v != nil {
 				data := struct {
 					MatchedPolicy string
-					Sync          bool
+					ActionSync    bool
+					SignalSync    bool
 					Verdict       bool
 					Metadata      map[string]any
 				}{
 					MatchedPolicy: cast.ToString(v.Data[act.MatchedPolicy]),
-					Sync:          cast.ToBool(v.Data[act.Sync]),
+					ActionSync:    cast.ToBool(v.Data[act.ActionSync]),
+					SignalSync:    cast.ToBool(v.Data[act.SignalSync]),
 					Verdict:       cast.ToBool(v.Data[act.Verdict]),
 					Metadata:      cast.ToStringMap(v.Data[act.Metadata]),
 				}
@@ -195,14 +197,14 @@ func main() {
 						Value: slog.StringValue(data.MatchedPolicy),
 					}, slog.Attr{
 						Key:   "sync",
-						Value: slog.BoolValue(data.Sync),
+						Value: slog.BoolValue(data.ActionSync),
 					}, slog.Attr{
 						Key:   "verdict",
 						Value: slog.BoolValue(data.Verdict),
 					},
 				)
 
-				if data.Sync {
+				if data.ActionSync {
 					result, err := reg.Actions[data.MatchedPolicy].Run(v.Data)
 					attrs := []slog.Attr{}
 					attrs = append(attrs, slog.Attr{
