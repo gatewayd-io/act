@@ -114,7 +114,7 @@ func main() {
 					"name": "OnTrafficFromClient",
 				},
 			},
-			Sync: true,
+			Sync: true, // This seems unnecessary since the action controls the sync.
 		},
 		{
 			Name: "log",
