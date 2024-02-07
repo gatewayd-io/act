@@ -12,8 +12,8 @@ policies:
     # hasPrefix(server.address, "192.168.1.1:")
     metadata:
       terminate: stop
-      hook:
-        terminate: OnTrafficFromClient
+      # hook:
+      #   terminate: OnTrafficFromClient
       # server:
       #   address: "192.168.1.1:5432"
     # next:

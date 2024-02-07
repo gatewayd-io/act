@@ -22,8 +22,8 @@ type Registry struct {
 	Negative []string
 
 	// Job queue
-	Inputs chan *Result
-	Queue  *queue.Queue
+	Results chan *Result
+	Queue   *queue.Queue
 }
 
 type Input struct {
@@ -85,7 +85,7 @@ func NewRegistry(defaultPolicy string) *Registry {
 		Negative: []string{
 			"terminate", "block", "drop", "reject", "reset",
 		},
-		Inputs: resultsCh,
+		Results: resultsCh,
 		Queue: queue.NewPool(2,
 			queue.WithFn(func(ctx context.Context, m core.QueuedMessage) error {
 				v, ok := m.(*Result)

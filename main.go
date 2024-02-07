@@ -147,7 +147,7 @@ func main() {
 		defer wg.Done()
 		for {
 			select {
-			case i := <-r.Inputs:
+			case i := <-r.Results:
 				matchedPolicy := cast.ToString(i.Data[act.MatchedPolicy])
 				result, err := reg.Actions[matchedPolicy].Run(i.Data)
 				attrs := []slog.Attr{}
